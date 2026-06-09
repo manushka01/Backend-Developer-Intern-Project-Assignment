@@ -1,115 +1,241 @@
-📌 Backend Developer (Intern) – Project Assignment : Expected time : 2 hours 
-About the Assignment
-We are seeking Backend Developer Interns (preferably 4th year students or recent graduates) who can design secure, scalable backend systems. Alongside building strong backend APIs, you will also create a basic frontend UI to demonstrate and interact with your APIs.
+# ⚡ TaskFlow — Scalable REST API with Auth & RBAC
 
-Assignment Overview
-You will build a Scalable REST API with Authentication & Role-Based Access, and create a simple frontend UI for testing your APIs, within 3 days.
+A production-ready full-stack application demonstrating secure JWT authentication, role-based access control, and CRUD operations with a React frontend.
 
-Core Features to Implement
-✅ Backend (Primary Focus)
-User registration & login APIs with password hashing and JWT authentication
+---
 
+## 🏗 Architecture
 
-Role-based access (user vs admin)
+```
+taskflow/
+├── backend/              # Node.js + Express API
+│   ├── src/
+│   │   ├── config/       # DB connection, Swagger
+│   │   ├── controllers/  # Business logic
+│   │   ├── middleware/   # Auth, validation, error handling
+│   │   ├── models/       # Mongoose schemas (User, Task)
+│   │   ├── routes/       # Versioned API routes
+│   │   └── utils/        # JWT helpers, logger, response
+│   └── Dockerfile
+├── frontend/             # React.js SPA
+│   ├── src/
+│   │   ├── components/   # Navbar
+│   │   ├── context/      # Auth state (useReducer)
+│   │   ├── pages/        # Login, Register, Dashboard, Tasks, Admin
+│   │   └── services/     # Axios instance + API modules
+│   └── Dockerfile
+└── docker-compose.yml
+```
 
+---
 
-CRUD APIs for a secondary entity (e.g., tasks, notes, or products)
+## 🚀 Quick Start
 
+### Option A: Docker (Recommended)
 
-API versioning, error handling, validation
+```bash
+git clone <your-repo-url>
+cd taskflow
 
+# Copy env and set secrets
+cp backend/.env.example backend/.env
 
-API documentation (Swagger/Postman)
+# Start everything (MongoDB + Backend + Frontend)
+docker-compose up --build
+```
 
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:5000
+- Swagger Docs: http://localhost:5000/api-docs
 
-Database schema (Postgres/MySQL/MongoDB)
+### Option B: Local Development
 
+**Prerequisites:** Node.js 18+, MongoDB running locally
 
-✅ Basic Frontend (Supportive)
-Build with React.js / Next.js / Vanilla JS
+```bash
+# Backend
+cd backend
+npm install
+cp .env.example .env     # Edit MONGODB_URI and JWT secrets
+npm run dev              # Runs on :5000
 
+# Frontend (new terminal)
+cd frontend
+npm install
+npm start                # Runs on :3000
+```
 
-Simple UI to:
+---
 
+## 🔐 Authentication Flow
 
-Register & log in users
+```
+Register/Login → JWT Access Token (15min) + Refresh Token (7d)
+               ↓
+Protected routes → Bearer <accessToken> in Authorization header
+               ↓
+Token expired? → POST /api/v1/auth/refresh with refreshToken
+               ↓
+Logout → Refresh token invalidated in DB
+```
 
+---
 
-Access protected dashboard (JWT required)
+## 📋 API Reference
 
+### Auth Endpoints
 
-Perform CRUD actions on the entity
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/v1/auth/register` | ❌ | Register new user |
+| POST | `/api/v1/auth/login` | ❌ | Login, get tokens |
+| POST | `/api/v1/auth/refresh` | ❌ | Refresh access token |
+| POST | `/api/v1/auth/logout` | ✅ | Logout (invalidate refresh) |
+| GET  | `/api/v1/auth/me` | ✅ | Get own profile |
 
+### Task Endpoints
 
-Show error/success messages from API responses
+| Method | Endpoint | Auth | Role | Description |
+|--------|----------|------|------|-------------|
+| GET | `/api/v1/tasks` | ✅ | any | List tasks (paginated, filterable) |
+| POST | `/api/v1/tasks` | ✅ | any | Create task |
+| GET | `/api/v1/tasks/:id` | ✅ | any | Get single task |
+| PUT | `/api/v1/tasks/:id` | ✅ | any | Update task |
+| DELETE | `/api/v1/tasks/:id` | ✅ | any | Delete task |
+| PATCH | `/api/v1/tasks/:id/archive` | ✅ | admin | Archive task |
+| GET | `/api/v1/tasks/stats` | ✅ | admin | Task statistics |
 
+### User Endpoints (Admin only)
 
-✅ Security & Scalability
-Secure JWT token handling
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/users` | List all users |
+| GET | `/api/v1/users/:id` | Get user by ID |
+| PATCH | `/api/v1/users/:id/role` | Change user role |
+| PATCH | `/api/v1/users/:id/deactivate` | Deactivate user |
+| PUT | `/api/v1/users/profile` | Update own name |
 
+---
 
-Input sanitization & validation
+## 🗄 Database Schema
 
+### User
+```js
+{
+  name: String,        // required, 2-50 chars
+  email: String,       // unique, lowercase
+  password: String,    // bcrypt hashed (select: false)
+  role: "user"|"admin", // default: "user"
+  isActive: Boolean,
+  refreshToken: String, // select: false
+  lastLogin: Date,
+  createdAt, updatedAt  // auto
+}
+```
 
-Scalable project structure for new modules
+### Task
+```js
+{
+  title: String,       // required, 3-100 chars
+  description: String, // optional, max 1000
+  status: "todo"|"in_progress"|"done",
+  priority: "low"|"medium"|"high",
+  dueDate: Date,       // must be future
+  tags: [String],      // max 10
+  createdBy: ObjectId, // ref: User
+  assignedTo: ObjectId,// ref: User (optional)
+  isArchived: Boolean,
+  createdAt, updatedAt
+}
+```
 
+---
 
-Optional: caching (Redis), logging, or Docker deployment
+## 🔒 Security Practices
 
+| Practice | Implementation |
+|----------|---------------|
+| Password hashing | bcrypt with cost factor 12 |
+| JWT tokens | Short-lived access (15m) + rotating refresh (7d) |
+| Token storage | Refresh token stored in DB (invalidatable) |
+| Rate limiting | 100 req/15min global; 20 req/15min on auth |
+| Input validation | express-validator on all inputs |
+| HTTP security | helmet (HSTS, XSS, noSniff, etc.) |
+| CORS | Whitelist-based origin control |
+| Request size | 10kb JSON body limit |
+| Role enforcement | Middleware-level, not just frontend |
 
+---
 
-Deliverables
-Backend project hosted in GitHub with README.md setup
+## 📈 Scalability Notes
 
+### Horizontal Scaling
+- Stateless JWT auth → multiple API instances can run behind a load balancer (nginx/ALB)
+- Shared MongoDB cluster (Atlas M10+ for production)
+- Sticky sessions not required
 
-Working APIs for authentication & CRUD
+### Caching (Optional Extension)
+```
+Redis for:
+- Token blacklisting on logout
+- Response caching for GET /tasks (TTL: 30s)
+- Rate limiting counters (replaces in-memory)
+```
 
+### Microservices Path
+```
+Current monolith → split into:
+├── auth-service      (register/login/tokens)
+├── task-service      (CRUD)
+└── notification-svc  (email on task assignment)
+Communicate via REST or message queue (RabbitMQ/SQS)
+```
 
-Basic frontend UI that connects to your APIs
+### Database Indexes
+Defined in schemas for optimal query performance:
+- `{ createdBy, status }` — filter user's tasks by status
+- `{ status, priority }` — admin dashboards
+- `{ createdAt: -1 }` — chronological listing
 
+---
 
-API documentation (Swagger/Postman collection)
+## 🧪 Running Tests
 
+```bash
+cd backend
+npm test
+```
 
-Short scalability note (e.g., microservices, caching, load balancing)
+Tests cover: auth flow, CRUD operations, role-based access enforcement.
 
+---
 
+## 🌐 Environment Variables
 
-Evaluation Criteria
-✅ API design (REST principles, status codes, modularity)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | API port | `5000` |
+| `MONGODB_URI` | MongoDB connection string | — |
+| `JWT_ACCESS_SECRET` | Access token secret | — |
+| `JWT_REFRESH_SECRET` | Refresh token secret | — |
+| `JWT_ACCESS_EXPIRES` | Access token TTL | `15m` |
+| `JWT_REFRESH_EXPIRES` | Refresh token TTL | `7d` |
+| `CLIENT_URL` | Frontend origin for CORS | `http://localhost:3000` |
 
+---
 
-✅ Database schema design & management
+## 👤 Creating an Admin User
 
+After starting the app, register normally then promote via MongoDB:
 
-✅ Security practices (JWT handling, hashing, validation)
+```js
+// In MongoDB shell or Compass
+db.users.updateOne(
+  { email: "your@email.com" },
+  { $set: { role: "admin" } }
+)
+```
 
+---
 
-✅ Functional frontend integration
-
-
-✅ Scalability & deployment readiness
-
-
-HOW TO APPLY
-
-PLEASE SUBMIT THROUGH GOOGLE FORM DOC SHARED NOT BY EMAIL
-We’ll notify shortlisted candidates by Saturday after submission.
-Thanks,
-Sonika
-Primetrade.ai Hiring Team
-
-
- Frontend Developer Intern
-
-Candidates who advance will be notified by Saturday morning. Don't wait – the most 
-qualified candidates apply within the first 72 hours.
-
-Ideal for: Recent graduates, bootcamp graduates, undergraduates, and crypto-native analysts 
-who can demonstrate exceptional analytical ability.
-Don't miss this rare opportunity to join a team that's redefining trading intelligence in the 
-Web3 space. While others are analyzing historical data, you'll be shaping the future of crypto 
-trading.
-
-First come first serve, so get the task done asap
-
+Built with: Node.js · Express · MongoDB · Mongoose · JWT · React · Docker
